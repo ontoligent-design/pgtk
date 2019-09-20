@@ -1,13 +1,15 @@
 
 #%% Import libraries
 
-import pandas as pd
 import glob
+import os
+import subprocess
 import re
+import pandas as pd
 import xml.etree.ElementTree as ET
 import requests
 import sqlite3
-
+import fire
 
 #%% Definitions
 
@@ -17,6 +19,7 @@ rdf_path = rdf_dir + '/{0}/pg{0}.rdf'
 db_dir = './'
 db_name = db_dir + '/gutenberg.db'
 
+pg_rdf_url = "https://www.gutenberg.org/cache/epub/feeds/rdf-files.tar.zip"
 gut_url = 'https://www.gutenberg.org/ebooks/{}'
 gut_txt = 'https://www.gutenberg.org/ebooks/{}.txt.utf-8'
 
@@ -46,7 +49,7 @@ default_formats = ["text/plain; charset={}".format(cs)
 default_formats_str = '^\s*' + '|'.join(default_formats) + '\s*'
 default_formats_rgx =  re.compile(default_formats_str)
 
-#%% Functions
+#%% Core Functions
 
 def get_gids():
     gids = [path.split('/')[-1]
@@ -99,6 +102,7 @@ def get_catalog(gids):
     return df
 
 def get_catalog_wide(df):
+    print(df.head())
     df_wide = df.groupby(['gid', 'key']).val.apply(lambda x: '\n'.join(x))\
         .unstack().fillna('NONE GIVEN')
     return df_wide
@@ -131,35 +135,42 @@ def get_gids_for_pat_from_db(catalog, name_pat, key='creators'):
         df = pd.read_sql(sql, db, params=(name_pat,))
         return df.gid.tolist()
 
+#%% Commands
 
-#%%
+def download_catalog(overwrite=True):
+    """Download RDF catalog from Project Gutenburg"""
+    if overwrite == False or not os.path.exists('./cache/epub'):
+        print("Downloading RDF data")
+        rdf_file = pg_rdf_url.split('/')[-1]
+        subprocess.call(['wget', pg_rdf_url])
+        subprocess.call(['tar', '-zxf', rdf_file])
+        subprocess.call(['rm', rdf_file])
+    else:
+        print("RDF files exist on system. Set overwrite = True to overwrite.")
+    
+def populate_catalog(replace=True):
+    """Create db with downloaded RDF data"""
+    print("Creating df of RDF data")
+    # Check to see if RDF data is there ...
+    gids = get_gids()
+    df = get_catalog(gids)
+    df_wide = get_catalog_wide(df)
+    save_catalog_to_db(df_wide)
+
+#%% Run
 if __name__ == '__main__':
+    
+    commands = {
+        'download-catalog': download_catalog,
+        'populate-catalog': populate_catalog,
+        'popcat': populate_catalog,
+    }
+    fire.Fire(commands)
     
 #    gids = get_gids()
 #    df = get_catalog(gids)
 #    df_wide = get_catalog_wide(df)
 #    save_catalog_to_db(df_wide)
-    catalog = get_catalog_from_db()    
-    pat = 'AUSTEN, JANE'
-    austen_gids = get_gids_for_pat_from_db(catalog, pat)
-
-#%%
-    data_dir2 = '/home/rca2t/Public/ETA/data/gutenberg'
-
-
-milton = get_works_by('Milton, John')
-austen = get_works_by('Austen, Jane')
-
-import requests
-download_dir = '/home/rca2t/Public/ETA/data/gutenberg/downloads'
-def download_works(works, download_dir=download_dir):
-    gids = works.index.tolist()
-    for gid in gids:
-        print(gid)
-        url = 'https://www.gutenberg.org/ebooks/{}.txt.utf-8'.format(gid)
-        r = requests.get(url)
-        with open(download_dir+"/g{}.txt".format(gid), 'w', encoding='utf8') as out:
-            out.write(r.text)
-
-works = download_works(austen)
-milton.groupby('title').count()
+    # catalog = get_catalog_from_db()    
+    # pat = 'AUSTEN, JANE'
+    # austen_gids = get_gids_for_pat_from_db(catalog, pat)
