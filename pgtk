@@ -244,6 +244,26 @@ def search_fields(ti='', cr='', su='', la='EN', ty='TEXT', fo='%TEXT/PLAIN%'):
         results = pd.read_sql_query(sql, db, params=params)
         print_results(results, mode='short')
 
+def download_epubs(epub_file, outdir=None):
+    """Download epubs from a list of files generated from a search"""
+    if not outdir:
+        outdir = epub_file.split('.')[0]
+    if not os.path.exists(outdir):
+        os.mkdir(outdir)        
+    print("Downloading files to", outdir)
+    with open(epub_file, 'r') as file:
+        for line in file.readlines():
+            gid = line.split('|')[1]
+            try:
+                int(gid)         
+                print(gid)       
+                url = gut_utf8.format(gid)
+                r = requests.get(url)
+                with open("{}/pg{}.txt".format(outdir, gid), 'w') as outfile:
+                    outfile.write(r.text)
+            except ValueError as e:
+                print(gid, "not a GID")
+
 if __name__ == '__main__':
     
     commands = {
@@ -251,6 +271,7 @@ if __name__ == '__main__':
         'populate-database': populate_database,     'pd': populate_database,
         'remove-cache': remove_cache,               'rc': remove_cache,
         'run-query': run_query,                     'rq': run_query,
-        'search-fields': search_fields,             'sf': search_fields
+        'search-fields': search_fields,             'sf': search_fields,
+        'download-epubs': download_epubs,           'de': download_epubs
     }
     fire.Fire(commands)
