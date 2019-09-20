@@ -21,8 +21,10 @@ db_dir = './'
 db_name = db_dir + '/gutenberg.db'
 
 pg_rdf_url = "https://www.gutenberg.org/cache/epub/feeds/rdf-files.tar.zip"
+pg_index_url = "https://www.gutenberg.org/dirs/GUTINDEX.zip"
 gut_url = 'https://www.gutenberg.org/ebooks/{}'
-gut_txt = 'https://www.gutenberg.org/ebooks/{}.txt.utf-8'
+gut_txt = 'https://www.gutenberg.org/ebooks/{}.txt'
+gut_utf8 = 'https://www.gutenberg.org/ebooks/{}.txt.utf-8'
 
 ns = dict(base="http://www.gutenberg.org/",
     rdfs="http://www.w3.org/2000/01/rdf-schema#",
@@ -65,15 +67,16 @@ def get_rdf(gid):
     rdf = open(path, 'r', encoding='utf8').read()
     return rdf
 
-def get_text_url(gid):
-    return gut_txt.format(gid)
-
-def get_text_content(gid):
-    gut_url = get_text_url(gid)
+def get_text_content(url_template=gut_utf8,  gid):
+    gut_url = url_template.format(gid)
     r = requests.get(gut_url)
+    # May want to test if file is valid, i.e. check  for:
+    # <div class="header">
+    #     <h1>Page Not Found</h1>
+    # </div>
     return r.text
 
-def get_items(el, xpath, ns=ns):
+def get_metadata_items(el, xpath, ns=ns):
     items = [item.text for item in el.findall(xpath, namespaces=ns)]
     return items
 
@@ -84,7 +87,7 @@ def get_rdf_root(gid):
 
 def get_metadata(gid):
     root = get_rdf_root(gid)
-    md = {item:get_items(root, xpaths[item]) for item in xpaths}
+    md = {item:get_metadata_items(root, xpaths[item]) for item in xpaths}
     return md
 
 def get_catalog(gids):
@@ -121,9 +124,9 @@ def get_catalog_text(df_wide):
     df_text.creators = df_text.creators.fillna('None given')
     return df_text
     
-def save_catalog_to_db(catalog):
+def save_catalog_to_db(catalog, tname='catalog'):
     with sqlite3.connect(db_name) as db:
-        catalog.to_sql('catalog', db, index=True, if_exists='replace')
+        catalog.to_sql(tname, db, index=True, if_exists='replace')
 
 def get_catalog_from_db():
     with sqlite3.connect(db_name) as db:
@@ -141,7 +144,7 @@ def get_gids_for_pat_from_db(catalog, name_pat, key='creators'):
 def download_cache(overwrite=True):
     """Download RDF catalog from Project Gutenburg"""
     if overwrite == False or not os.path.exists('./cache/epub'):
-        print("Downloading RDF data")
+        print("Downloading RDF cache")
         rdf_zip = pg_rdf_url.split('/')[-1]
         rdf_tar =  rdf_zip.replace('.zip', '')
         subprocess.call(['wget', pg_rdf_url])
@@ -154,31 +157,73 @@ def download_cache(overwrite=True):
 
 def populate_database(replace=True):
     """Create db with downloaded RDF data"""
-    print("Creating database of RDF data")
-    # Check to see if RDF data is there ...
-    gids = get_gids()
-    df = get_catalog(gids)
-    df_wide = get_catalog_wide(df)
-    save_catalog_to_db(df_wide)
+    print("Creating database from RDF cache")
+    if  os.path.exists('./cache/epub'):
+        gids = get_gids()
+        cat = get_catalog(gids)
+        # save_catalog_to_db(cat)
+        cat_wide = get_catalog_wide(cat)
+        save_catalog_to_db(cat_wide)
+    else:
+        print("No RDF cache. Run download-cache first.")
 
 def remove_cache():
     """Remove RDF cache from file system"""
-    print("Removing cache")
+    print("Removing RDF cache")
     subprocess.call(['rm', '-rf', './cache'])
+
+def show_fields():
+    cat = get_catalog_from_db()
+    list = '\n'.join([r"{}{} {}".format(col[0], col[1], col)  for col in cat.columns.tolist()])
+    print(list)
+
+def print_results(results, mode='long'):
+    htmlfile = open('test.htm', 'w')
+    for i, idx in enumerate(results.index):
+        item = results.loc[idx]
+        if mode == 'long':
+            print()
+            print('NO:', i+1)
+            print('ID:', item.gid)
+            print('AU:', item.creators)
+            print('TI:', item.title)
+            # print('FT:', item.formats.replace('\n', '\nFT: '))
+            print('DL:', gut_utf8.format(item.gid))
+            print('DL:', gut_url.format(item.gid))
+            print('SU:', item.subjects.replace('\n', '\nSU: '))
+        elif mode == 'short':
+            print(i+1, item.gid, item.creators.replace('\n', ', '),
+                  item.title.replace('\n', ', '), gut_utf8.format(item.gid), sep='|')
+
+def search_pattern(pat, field='creators', type='Text', limit=20):
+    cat = get_catalog_from_db()
+    results = cat.loc[cat[field].str.contains(pat, case=False), ['title','creators','subjects']].head(limit)
+    print_results(results, mode='short')
+
+def run_query(where_clause, limit=1000, mode='short'):
+    """Run a query to the catalog table in the database. Don't use a LIMIT clause; instead pass argument."""
+    sql = "SELECT * FROM catalog WHERE {} ORDER BY creators, title LIMIT {}".format(where_clause, limit)
+    # print(sql)
+    with sqlite3.connect(db_name) as db:
+        results = pd.read_sql_query(sql, db)
+        print_results(results, mode=mode)
+
+def search_author(pat, limit=1000, mode='short'):
+    pat = ', '.join(pat) # NOT GOOD
+    where_clause = """creators like '%{}%' and languages like 'EN' 
+    and types = 'TEXT' and formats like '%TEXT/PLAIN%'""".format(pat.upper())
+    run_query(where_clause, limit=limit, mode=mode)
 
 #%% Run
 if __name__ == '__main__':
     
     commands = {
-        'download-cache': download_cache,
-        'dc': download_cache,
-        'populate-database': populate_database,
-        'pd': populate_database,
-        'remove-cache': remove_cache,
-        'rc': remove_cache
+        'download-cache': download_cache, 'dc': download_cache,
+        'populate-database': populate_database, 'pd': populate_database,
+        'remove-cache': remove_cache, 'rc': remove_cache,
+        'show-fields': show_fields, 'sf': show_fields,
+        'search-pattern': search_pattern, 'sp': search_pattern,
+        'run-query': run_query, 'rc': run_query,
+        'search-author': search_author, 'sa': search_author
     }
     fire.Fire(commands)
-    
-    # catalog = get_catalog_from_db()
-    # pat = 'AUSTEN, JANE'
-    # austen_gids = get_gids_for_pat_from_db(catalog, pat)
