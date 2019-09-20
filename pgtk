@@ -106,7 +106,7 @@ def get_rdf_root(gid):
 
 def get_metadata(gid):
     root = get_rdf_root(gid)
-    md = {item:get_metadata_items(root, xpaths[item]) for item in xpaths}
+    md = {item : get_metadata_items(root, xpaths[item]) for item in xpaths}
     return md
 
 def get_catalog(gids):
@@ -120,6 +120,7 @@ def get_catalog(gids):
                 vals = md[key]
             for val in vals:
                 val = val.upper()
+                val = re.sub(r'\r', ' ', val)
                 data.append((gid, key, val))
     df = pd.DataFrame(data, columns=['gid','key','val'])
     return df
@@ -180,7 +181,6 @@ def populate_database(replace=True):
     if  os.path.exists(rdf_dir):
         gids = get_gids()
         cat = get_catalog(gids)
-        # save_catalog_to_db(cat)
         cat_wide = get_catalog_wide(cat)
         save_catalog_to_db(cat_wide)
     else:
@@ -190,11 +190,6 @@ def remove_cache():
     """Remove RDF cache from file system"""
     print("Removing RDF cache")
     subprocess.call(['rm', '-rf', rdf_dir])
-
-# def show_fields():
-#     cat = get_catalog_from_db()
-#     list = '\n'.join([r"{}{} {}".format(col[0], col[1], col)  for col in cat.columns.tolist()])
-#     print(list)
 
 def print_results(results, mode='long'):
     for i, idx in enumerate(results.index):
@@ -214,12 +209,6 @@ def print_results(results, mode='long'):
                   item.title.replace('\n', ', '), gut_utf8.format(item.gid), sep='|')
         else:
             print("No mode selected.")
-
-# def search_field(pat, field='creators', type='Text', limit=20):
-#     """Search catalog by single field"""
-#     cat = get_catalog_from_db()
-#     results = cat.loc[cat[field].str.contains(pat, case=False), ['title','creators','subjects']].head(limit)
-#     print_results(results, mode='short')
 
 def run_query(where_clause, limit=1000, mode='short'):
     """Run a query to the catalog table in the database. Don't use a LIMIT clause; instead pass argument."""
@@ -255,24 +244,13 @@ def search_fields(ti='', cr='', su='', la='EN', ty='TEXT', fo='%TEXT/PLAIN%'):
         results = pd.read_sql_query(sql, db, params=params)
         print_results(results, mode='short')
 
-# def search_author(pat, limit=1000, mode='short'):
-#     """Search for an author by substring"""
-#     pat = ', '.join(pat)
-#     where_clause = """creators like '%{}%' and languages like 'EN' 
-#     and types = 'TEXT' and formats like '%TEXT/PLAIN%'""".format(pat.upper())
-#     run_query(where_clause, limit=limit, mode=mode)
-0
-#%% Run
 if __name__ == '__main__':
     
     commands = {
-        'download-cache': download_cache, 'dc': download_cache,
-        'populate-database': populate_database, 'pd': populate_database,
-        'remove-cache': remove_cache, 'rc': remove_cache,
-        # 'list-fields': show_fields, 'lf': show_fields,
-        # 'search-pattern': search_pattern, 'sp': search_pattern,
-        'run-query': run_query, 'rq': run_query,
-        # 'search-author': search_author, 'sa': search_author,
-        'search-fields': search_fields, 'sf': search_fields
+        'download-cache': download_cache,           'dc': download_cache,
+        'populate-database': populate_database,     'pd': populate_database,
+        'remove-cache': remove_cache,               'rc': remove_cache,
+        'run-query': run_query,                     'rq': run_query,
+        'search-fields': search_fields,             'sf': search_fields
     }
     fire.Fire(commands)
