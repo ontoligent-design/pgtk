@@ -159,7 +159,7 @@ def get_gids_for_pat_from_db(catalog, name_pat, key='creators'):
 
 def download_cache(overwrite=True):
     """Download RDF catalog from Project Gutenburg"""
-    if overwrite == False or not os.path.exists(pgtk_home+'/cache/epub'):
+    if overwrite == False or not os.path.exists(rdf_dir):
         print("Downloading RDF cache")
         rdf_zip = pg_rdf_url.split('/')[-1]
         rdf_tar =  rdf_zip.replace('.zip', '')
@@ -174,7 +174,7 @@ def download_cache(overwrite=True):
 def populate_database(replace=True):
     """Create db with downloaded RDF data"""
     print("Creating database from RDF cache")
-    if  os.path.exists(pgtk_home+'/cache/epub'):
+    if  os.path.exists(rdf_dir):
         gids = get_gids()
         cat = get_catalog(gids)
         # save_catalog_to_db(cat)
@@ -186,7 +186,7 @@ def populate_database(replace=True):
 def remove_cache():
     """Remove RDF cache from file system"""
     print("Removing RDF cache")
-    subprocess.call(['rm', '-rf', pgtk_home+'/cache'])
+    subprocess.call(['rm', '-rf', rdf_dir'])
 
 # def show_fields():
 #     cat = get_catalog_from_db()
@@ -258,7 +258,7 @@ def search_fields(ti='', cr='', su='', la='EN', ty='TEXT', fo='%TEXT/PLAIN%'):
 #     where_clause = """creators like '%{}%' and languages like 'EN' 
 #     and types = 'TEXT' and formats like '%TEXT/PLAIN%'""".format(pat.upper())
 #     run_query(where_clause, limit=limit, mode=mode)
-
+0
 #%% Run
 if __name__ == '__main__':
     
