@@ -4,6 +4,7 @@
 
 import glob
 import os
+import sys
 import subprocess
 import re
 import pandas as pd
@@ -14,10 +15,12 @@ import fire
 
 #%% Definitions
 
-if os.environ['PGTK_HOME']:
+try:
+# if os.environ['PGTK_HOME']:
     pgtk_home = os.environ['PGTK_HOME']
-else:
-    sys.exit('Please PGTK_HOME')
+# else:
+except KeyError:
+    sys.exit('Please set PGTK_HOME.')
 
 rdf_dir = pgtk_home + '/cache/epub'
 rdf_path = rdf_dir + '/{0}/pg{0}.rdf'
@@ -186,7 +189,7 @@ def populate_database(replace=True):
 def remove_cache():
     """Remove RDF cache from file system"""
     print("Removing RDF cache")
-    subprocess.call(['rm', '-rf', rdf_dir'])
+    subprocess.call(['rm', '-rf', rdf_dir])
 
 # def show_fields():
 #     cat = get_catalog_from_db()

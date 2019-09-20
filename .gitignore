@@ -1,6 +1,6 @@
-./*.*~
-./cache/*
-./*.db
-./.vscode
-./.idea
-./.spyproject
+*.*~
+cache/*
+*.db
+.vscode/
+.idea/
+.spyproject/
