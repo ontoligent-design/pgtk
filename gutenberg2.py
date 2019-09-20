@@ -1,3 +1,4 @@
+#! /usr/bin/env python
 
 #%% Import libraries
 
@@ -137,40 +138,47 @@ def get_gids_for_pat_from_db(catalog, name_pat, key='creators'):
 
 #%% Commands
 
-def download_catalog(overwrite=True):
+def download_cache(overwrite=True):
     """Download RDF catalog from Project Gutenburg"""
     if overwrite == False or not os.path.exists('./cache/epub'):
         print("Downloading RDF data")
-        rdf_file = pg_rdf_url.split('/')[-1]
+        rdf_zip = pg_rdf_url.split('/')[-1]
+        rdf_tar =  rdf_zip.replace('.zip', '')
         subprocess.call(['wget', pg_rdf_url])
-        subprocess.call(['tar', '-zxf', rdf_file])
-        subprocess.call(['rm', rdf_file])
+        subprocess.call(['unzip', rdf_zip])
+        subprocess.call(['tar', '-xf', rdf_tar])
+        subprocess.call(['rm', rdf_zip])
+        subprocess.call(['rm', rdf_tar])
     else:
         print("RDF files exist on system. Set overwrite = True to overwrite.")
-    
-def populate_catalog(replace=True):
+
+def populate_database(replace=True):
     """Create db with downloaded RDF data"""
-    print("Creating df of RDF data")
+    print("Creating database of RDF data")
     # Check to see if RDF data is there ...
     gids = get_gids()
     df = get_catalog(gids)
     df_wide = get_catalog_wide(df)
     save_catalog_to_db(df_wide)
 
+def remove_cache():
+    """Remove RDF cache from file system"""
+    print("Removing cache")
+    subprocess.call(['rm', '-rf', './cache'])
+
 #%% Run
 if __name__ == '__main__':
     
     commands = {
-        'download-catalog': download_catalog,
-        'populate-catalog': populate_catalog,
-        'popcat': populate_catalog,
+        'download-cache': download_cache,
+        'dc': download_cache,
+        'populate-database': populate_database,
+        'pd': populate_database,
+        'remove-cache': remove_cache,
+        'rc': remove_cache
     }
     fire.Fire(commands)
     
-#    gids = get_gids()
-#    df = get_catalog(gids)
-#    df_wide = get_catalog_wide(df)
-#    save_catalog_to_db(df_wide)
-    # catalog = get_catalog_from_db()    
+    # catalog = get_catalog_from_db()
     # pat = 'AUSTEN, JANE'
     # austen_gids = get_gids_for_pat_from_db(catalog, pat)
