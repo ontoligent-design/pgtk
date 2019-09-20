@@ -47,6 +47,18 @@ xpaths = dict(
     formats = ".//dcterms:hasFormat/pgterms:file/dcterms:format/rdf:Description/rdf:value"
 )
 
+cat_fields = dict(
+    ag = 'agents',
+    bo = 'bookshelves',
+    cr = 'creators',
+    fo = 'formats',
+    la = 'languages',
+    ri = 'rights',
+    su = 'subjects',
+    ti = 'title',
+    ty = 'types'
+)
+
 default_formats = ["text/plain; charset={}".format(cs) 
                    for cs in ['utf-8', 'ascii', 'iso-8859-1']] + ['text/plain']
 default_formats_str = '^\s*' + '|'.join(default_formats) + '\s*'
@@ -67,7 +79,7 @@ def get_rdf(gid):
     rdf = open(path, 'r', encoding='utf8').read()
     return rdf
 
-def get_text_content(url_template=gut_utf8,  gid):
+def get_text_content(gid, url_template=gut_utf8):
     gut_url = url_template.format(gid)
     r = requests.get(gut_url)
     # May want to test if file is valid, i.e. check  for:
@@ -178,7 +190,6 @@ def show_fields():
     print(list)
 
 def print_results(results, mode='long'):
-    htmlfile = open('test.htm', 'w')
     for i, idx in enumerate(results.index):
         item = results.loc[idx]
         if mode == 'long':
@@ -194,22 +205,49 @@ def print_results(results, mode='long'):
         elif mode == 'short':
             print(i+1, item.gid, item.creators.replace('\n', ', '),
                   item.title.replace('\n', ', '), gut_utf8.format(item.gid), sep='|')
+        else:
+            print("No mode selected.")
 
-def search_pattern(pat, field='creators', type='Text', limit=20):
-    cat = get_catalog_from_db()
-    results = cat.loc[cat[field].str.contains(pat, case=False), ['title','creators','subjects']].head(limit)
-    print_results(results, mode='short')
+# def search_field(pat, field='creators', type='Text', limit=20):
+#     """Search catalog by single field"""
+#     cat = get_catalog_from_db()
+#     results = cat.loc[cat[field].str.contains(pat, case=False), ['title','creators','subjects']].head(limit)
+#     print_results(results, mode='short')
 
 def run_query(where_clause, limit=1000, mode='short'):
     """Run a query to the catalog table in the database. Don't use a LIMIT clause; instead pass argument."""
     sql = "SELECT * FROM catalog WHERE {} ORDER BY creators, title LIMIT {}".format(where_clause, limit)
-    # print(sql)
     with sqlite3.connect(db_name) as db:
         results = pd.read_sql_query(sql, db)
         print_results(results, mode=mode)
 
+def search_fields(ti='', cr='', su='',  la='EN', ty='TEXT'):
+    """Search catalog by fields -- title (ti), creators (cr), and subjects (su)."""
+    args = locals()
+    where_clause_list = []
+    params = []
+    for f in args:
+        if args[f] != '':
+            where_clause_list.append("{} LIKE ? ".format(cat_fields[f]))            
+            if str(type(args[f])) == "<class 'tuple'>":
+                args[f] = ', '.join(args[f])
+            if f == 'ti' or f == 'su' or f == 'cr':
+                args[f] = "%{}%".format(args[f].upper())
+            params.append(args[f])
+    where_clause = '\nAND '.join(where_clause_list)
+    sql = """
+    SELECT * FROM catalog
+    WHERE {}
+    ORDER BY creators, title
+    LIMIT 100
+    """.format(where_clause)
+    with sqlite3.connect(db_name) as db:
+        results = pd.read_sql_query(sql, db, params=params)
+        print_results(results, mode='short')
+
 def search_author(pat, limit=1000, mode='short'):
-    pat = ', '.join(pat) # NOT GOOD
+    """Search for an author by substring"""
+    pat = ', '.join(pat)
     where_clause = """creators like '%{}%' and languages like 'EN' 
     and types = 'TEXT' and formats like '%TEXT/PLAIN%'""".format(pat.upper())
     run_query(where_clause, limit=limit, mode=mode)
@@ -221,9 +259,10 @@ if __name__ == '__main__':
         'download-cache': download_cache, 'dc': download_cache,
         'populate-database': populate_database, 'pd': populate_database,
         'remove-cache': remove_cache, 'rc': remove_cache,
-        'show-fields': show_fields, 'sf': show_fields,
-        'search-pattern': search_pattern, 'sp': search_pattern,
-        'run-query': run_query, 'rc': run_query,
-        'search-author': search_author, 'sa': search_author
+        'list-fields': show_fields, 'lf': show_fields,
+        # 'search-pattern': search_pattern, 'sp': search_pattern,
+        'run-query': run_query, 'rq': run_query,
+        'search-author': search_author, 'sa': search_author,
+        'search-fields': search_fields, 'sf': search_fields
     }
     fire.Fire(commands)
