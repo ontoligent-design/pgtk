@@ -1,1 +1,6 @@
-*.*~
+./*.*~
+./cache/*
+./*.db
+./.vscode
+./.idea
+./.spyproject
