@@ -16,17 +16,13 @@ import fire
 #%% Definitions
 
 try:
-# if os.environ['PGTK_HOME']:
     pgtk_home = os.environ['PGTK_HOME']
-# else:
 except KeyError:
     sys.exit('Please set PGTK_HOME.')
 
 rdf_dir = pgtk_home + '/cache/epub'
 rdf_path = rdf_dir + '/{0}/pg{0}.rdf'
-
 db_name = pgtk_home + '/gutenberg.db'
-
 pg_rdf_url = "https://www.gutenberg.org/cache/epub/feeds/rdf-files.tar.zip"
 pg_index_url = "https://www.gutenberg.org/dirs/GUTINDEX.zip"
 gut_url = 'https://www.gutenberg.org/ebooks/{}'
@@ -192,6 +188,7 @@ def remove_cache():
     subprocess.call(['rm', '-rf', rdf_dir])
 
 def print_results(results, mode='long'):
+    """Print search results in standard format"""
     for i, idx in enumerate(results.index):
         item = results.loc[idx]
         if mode == 'long':
@@ -211,8 +208,10 @@ def print_results(results, mode='long'):
             print("No mode selected.")
 
 def run_query(where_clause, limit=1000, mode='short'):
-    """Run a query to the catalog table in the database. Don't use a LIMIT clause; instead pass argument."""
-    sql = "SELECT * FROM catalog WHERE {} ORDER BY creators, title LIMIT {}".format(where_clause, limit)
+    """Run a query to the catalog table in the database. 
+    Don't use a LIMIT clause; instead pass argument."""
+    sql = "SELECT * FROM catalog WHERE {} ORDER BY creators, title LIMIT {}"\
+        .format(where_clause, limit)
     with sqlite3.connect(db_name) as db:
         results = pd.read_sql_query(sql, db)
         print_results(results, mode=mode)
@@ -238,7 +237,6 @@ def search_fields(ti='', cr='', su='', la='EN', ty='TEXT', fo='%TEXT/PLAIN%'):
     SELECT * FROM catalog
     WHERE {}
     ORDER BY creators, title
-    LIMIT 100
     """.format(where_clause)
     with sqlite3.connect(db_name) as db:
         results = pd.read_sql_query(sql, db, params=params)
@@ -246,20 +244,23 @@ def search_fields(ti='', cr='', su='', la='EN', ty='TEXT', fo='%TEXT/PLAIN%'):
 
 def download_epubs(epub_file, outdir=None):
     """Download epubs from a list of files generated from a search"""
+    
     if not outdir:
         outdir = epub_file.split('.')[0]
     if not os.path.exists(outdir):
         os.mkdir(outdir)        
+    
     print("Downloading files to", outdir)
     with open(epub_file, 'r') as file:
         for line in file.readlines():
             gid = line.split('|')[1]
             try:
                 int(gid)         
-                print(gid)       
                 url = gut_utf8.format(gid)
                 r = requests.get(url)
-                with open("{}/pg{}.txt".format(outdir, gid), 'w') as outfile:
+                filename = re.sub(r'\W+', '_', '_'.join(line.split('|')[2:4]))
+                print(gid, filename)       
+                with open("{}/{}-pg{}.txt".format(outdir, filename, gid), 'w') as outfile:
                     outfile.write(r.text)
             except ValueError as e:
                 print(gid, "not a GID")
