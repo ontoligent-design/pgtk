@@ -14,11 +14,15 @@ import fire
 
 #%% Definitions
 
-rdf_dir = './cache/epub'
+if os.environ['PGTK_HOME']:
+    pgtk_home = os.environ['PGTK_HOME']
+else:
+    sys.exit('Please PGTK_HOME')
+
+rdf_dir = pgtk_home + '/cache/epub'
 rdf_path = rdf_dir + '/{0}/pg{0}.rdf'
 
-db_dir = './'
-db_name = db_dir + '/gutenberg.db'
+db_name = pgtk_home + '/gutenberg.db'
 
 pg_rdf_url = "https://www.gutenberg.org/cache/epub/feeds/rdf-files.tar.zip"
 pg_index_url = "https://www.gutenberg.org/dirs/GUTINDEX.zip"
@@ -132,8 +136,8 @@ def get_catalog_text(df_wide):
     df_wide = df_wide.loc[df_wide.rights.str.match('Public')]
     txtidx = df_wide.formats.str.contains(default_formats_rgx).fillna(False)
     df_text = df_wide.loc[txtidx, ['title', 'creators', 'subjects']]
-    df_text.subjects = df_text.subjects.fillna('None given')
-    df_text.creators = df_text.creators.fillna('None given')
+    df_text.subjects = df_text.subjects.fillna('NONE GIVEN')
+    df_text.creators = df_text.creators.fillna('NONE GIVEN')
     return df_text
     
 def save_catalog_to_db(catalog, tname='catalog'):
@@ -155,7 +159,7 @@ def get_gids_for_pat_from_db(catalog, name_pat, key='creators'):
 
 def download_cache(overwrite=True):
     """Download RDF catalog from Project Gutenburg"""
-    if overwrite == False or not os.path.exists('./cache/epub'):
+    if overwrite == False or not os.path.exists(pgtk_home+'/cache/epub'):
         print("Downloading RDF cache")
         rdf_zip = pg_rdf_url.split('/')[-1]
         rdf_tar =  rdf_zip.replace('.zip', '')
@@ -170,7 +174,7 @@ def download_cache(overwrite=True):
 def populate_database(replace=True):
     """Create db with downloaded RDF data"""
     print("Creating database from RDF cache")
-    if  os.path.exists('./cache/epub'):
+    if  os.path.exists(pgtk_home+'/cache/epub'):
         gids = get_gids()
         cat = get_catalog(gids)
         # save_catalog_to_db(cat)
@@ -182,12 +186,12 @@ def populate_database(replace=True):
 def remove_cache():
     """Remove RDF cache from file system"""
     print("Removing RDF cache")
-    subprocess.call(['rm', '-rf', './cache'])
+    subprocess.call(['rm', '-rf', pgtk_home+'/cache'])
 
-def show_fields():
-    cat = get_catalog_from_db()
-    list = '\n'.join([r"{}{} {}".format(col[0], col[1], col)  for col in cat.columns.tolist()])
-    print(list)
+# def show_fields():
+#     cat = get_catalog_from_db()
+#     list = '\n'.join([r"{}{} {}".format(col[0], col[1], col)  for col in cat.columns.tolist()])
+#     print(list)
 
 def print_results(results, mode='long'):
     for i, idx in enumerate(results.index):
@@ -221,8 +225,11 @@ def run_query(where_clause, limit=1000, mode='short'):
         results = pd.read_sql_query(sql, db)
         print_results(results, mode=mode)
 
-def search_fields(ti='', cr='', su='',  la='EN', ty='TEXT'):
-    """Search catalog by fields -- title (ti), creators (cr), and subjects (su)."""
+def search_fields(ti='', cr='', su='', la='EN', ty='TEXT', fo='%TEXT/PLAIN%'):
+    """Search catalog by fields:  title (ti), creators (cr), and subjects (su).
+    Also: languages (la) defaults to 'EN', types (ty) defaults to 'TEXT', and 
+    formats (fo) defaults to '%TEXT/PLAIN%'.
+    """
     args = locals()
     where_clause_list = []
     params = []
@@ -245,12 +252,12 @@ def search_fields(ti='', cr='', su='',  la='EN', ty='TEXT'):
         results = pd.read_sql_query(sql, db, params=params)
         print_results(results, mode='short')
 
-def search_author(pat, limit=1000, mode='short'):
-    """Search for an author by substring"""
-    pat = ', '.join(pat)
-    where_clause = """creators like '%{}%' and languages like 'EN' 
-    and types = 'TEXT' and formats like '%TEXT/PLAIN%'""".format(pat.upper())
-    run_query(where_clause, limit=limit, mode=mode)
+# def search_author(pat, limit=1000, mode='short'):
+#     """Search for an author by substring"""
+#     pat = ', '.join(pat)
+#     where_clause = """creators like '%{}%' and languages like 'EN' 
+#     and types = 'TEXT' and formats like '%TEXT/PLAIN%'""".format(pat.upper())
+#     run_query(where_clause, limit=limit, mode=mode)
 
 #%% Run
 if __name__ == '__main__':
@@ -259,10 +266,10 @@ if __name__ == '__main__':
         'download-cache': download_cache, 'dc': download_cache,
         'populate-database': populate_database, 'pd': populate_database,
         'remove-cache': remove_cache, 'rc': remove_cache,
-        'list-fields': show_fields, 'lf': show_fields,
+        # 'list-fields': show_fields, 'lf': show_fields,
         # 'search-pattern': search_pattern, 'sp': search_pattern,
         'run-query': run_query, 'rq': run_query,
-        'search-author': search_author, 'sa': search_author,
+        # 'search-author': search_author, 'sa': search_author,
         'search-fields': search_fields, 'sf': search_fields
     }
     fire.Fire(commands)
