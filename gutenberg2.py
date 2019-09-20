@@ -1,5 +1,6 @@
 
-#%%
+#%% Import libraries
+
 import pandas as pd
 import glob
 import re
@@ -8,12 +9,13 @@ import requests
 import sqlite3
 
 
-#%%
-data_dir = './cache/epub'
-epub_path = data_dir + '/{0}/pg{0}.rdf'
-TAG = re.compile(r'<[^>]+>')
+#%% Definitions
 
-# Data 
+rdf_dir = './cache/epub'
+rdf_path = rdf_dir + '/{0}/pg{0}.rdf'
+
+db_dir = './'
+db_name = db_dir + '/gutenberg.db'
 
 gut_url = 'https://www.gutenberg.org/ebooks/{}'
 gut_txt = 'https://www.gutenberg.org/ebooks/{}.txt.utf-8'
@@ -41,28 +43,29 @@ xpaths = dict(
 
 default_formats = ["text/plain; charset={}".format(cs) 
                    for cs in ['utf-8', 'ascii', 'iso-8859-1']] + ['text/plain']
-default_formats_str = '|'.join(default_formats)
+default_formats_str = '^\s*' + '|'.join(default_formats) + '\s*'
+default_formats_rgx =  re.compile(default_formats_str)
 
-# Functions
+#%% Functions
 
-def get_gids(data_dir=data_dir):
-    gids = [int(path.split('/')[-1])
-        for path in glob.glob(data_dir+'/*')
-        if not re.search(r'delete', path, re.IGNORECASE)]
+def get_gids():
+    gids = [path.split('/')[-1]
+        for path in glob.glob(rdf_dir + '/*')]
+    gids = [int(gid) for gid in gids
+        if not re.search(r'[^0-9]+', gid)]
     gids = sorted(gids)
     return gids
 
-def get_rdf(gut_id, data_dir=data_dir):
-    path = "{0}/{1}/pg{1}.rdf".format(data_dir, gut_id)
+def get_rdf(gid):
+    path = rdf_path.format(gid)
     rdf = open(path, 'r', encoding='utf8').read()
     return rdf
 
-def get_text_url(gut_id):
-    gut_txt = gut_txt.format(gut_id)
-    return gut_txt
+def get_text_url(gid):
+    return gut_txt.format(gid)
 
-def get_text_content(gut_id):
-    gut_url = get_text_url(gut_id)
+def get_text_content(gid):
+    gut_url = get_text_url(gid)
     r = requests.get(gut_url)
     return r.text
 
@@ -70,16 +73,14 @@ def get_items(el, xpath, ns=ns):
     items = [item.text for item in el.findall(xpath, namespaces=ns)]
     return items
 
-def get_rdf_root(gut_id):
-    rdf = get_rdf(gut_id)
+def get_rdf_root(gid):
+    rdf = get_rdf(gid)
     root = ET.fromstring(rdf)
     return root 
 
-def get_metadata(gut_id):
-    rdf_root = get_rdf_root(gut_id)
-    md = {}
-    for item in xpaths:
-        md[item] = get_items(rdf_root, xpaths[item])
+def get_metadata(gid):
+    root = get_rdf_root(gid)
+    md = {item:get_items(root, xpaths[item]) for item in xpaths}
     return md
 
 def get_catalog(gids):
@@ -87,72 +88,67 @@ def get_catalog(gids):
     for gid in gids:
         md = get_metadata(gid)
         for key in md.keys():
-            for val in md[key]:
+            if key == 'formats':
+                vals = sorted(md[key])
+            else:
+                vals = md[key]
+            for val in vals:
+                val = val.upper()
                 data.append((gid, key, val))
     df = pd.DataFrame(data, columns=['gid','key','val'])
     return df
 
-#%% Get GIDs
-gids = get_gids()
+def get_catalog_wide(df):
+    df_wide = df.groupby(['gid', 'key']).val.apply(lambda x: '\n'.join(x))\
+        .unstack().fillna('NONE GIVEN')
+    return df_wide
 
-#%% 
-df = get_catalog(gids)
+def get_reduced_wide(df, cols=['title', 'creators', 'formats', 'languages', 'types']):
+    return df[cols]
+
+def get_catalog_text(df_wide):
+    df_wide = df_wide.loc[df_wide.languages == 'en']
+    df_wide = df_wide.loc[df_wide.types == 'Text']
+    df_wide = df_wide.loc[df_wide.rights.str.match('Public')]
+    txtidx = df_wide.formats.str.contains(default_formats_rgx).fillna(False)
+    df_text = df_wide.loc[txtidx, ['title', 'creators', 'subjects']]
+    df_text.subjects = df_text.subjects.fillna('None given')
+    df_text.creators = df_text.creators.fillna('None given')
+    return df_text
+    
+def save_catalog_to_db(catalog):
+    with sqlite3.connect(db_name) as db:
+        catalog.to_sql('catalog', db, index=True, if_exists='replace')
+
+def get_catalog_from_db():
+    with sqlite3.connect(db_name) as db:
+        catalog = pd.read_sql('select * from catalog', db, index_col='gid')
+        return catalog
+    
+def get_gids_for_pat_from_db(catalog, name_pat, key='creators'):
+    sql  = "SELECT gid FROM catalog WHERE creators LIKE ?"
+    with sqlite3.connect(db_name) as db:
+        df = pd.read_sql(sql, db, params=(name_pat,))
+        return df.gid.tolist()
+
 
 #%%
-df_wide = df.groupby(['gid', 'key']).val.apply(lambda x: '|'.join(x)).unstack()
-df_wide = df_wide.loc[df_wide.languages == 'en']
-df_wide = df.wide.loc[df_wide.types == 'Text']
-df_wide = df.wide.loc[df_wide.rights.str.match('Public')
+if __name__ == '__main__':
+    
+#    gids = get_gids()
+#    df = get_catalog(gids)
+#    df_wide = get_catalog_wide(df)
+#    save_catalog_to_db(df_wide)
+    catalog = get_catalog_from_db()    
+    pat = 'AUSTEN, JANE'
+    austen_gids = get_gids_for_pat_from_db(catalog, pat)
 
 #%%
-TEXT = df_wide.formats.str.contains(r"^\s*({})\s*".format(default_formats_str)).fillna(False)
-df_text = df_wide.loc[TEXT]
+    data_dir2 = '/home/rca2t/Public/ETA/data/gutenberg'
 
-#%%
-catalog = df_text[['title', 'creators', 'subjects']].copy()
-
-#%%
-catalog.subjects = catalog.subjects.fillna('None given')
-catalog.creators = catalog.creators.fillna('None given')
-
-#%%
-db_dir = './'
-with sqlite3.connect(db_dir + '/gutenberg.db') as db:
-    catalog.to_sql('catalog', db, index=True, if_exists='replace')
-
-#%%
-tables = {}
-for key in xpaths.keys():
-    print(key)
-    items = df.loc[df.key==key, ['gid','val']]
-    items = items.set_index('gid')
-    items = pd.Series(items.val)
-    tables[key] = items
-
-UTF = tables['formats'].str.contains('text/plain; charset=utf')
-
-tables['title']
-
-data_dir2 = '/home/rca2t/Public/ETA/data/gutenberg'
-
-import sqlite3
-
-with sqlite3.connect(data_dir2 + '/gutenberg.db') as db:
-    for table in tables:
-        print(table)
-        tables[table].to_sql(table, db, index=True, if_exists='replace')
-
-df.loc[(df.key=='formats') &  (df.val.str.match('text/plain'))].val.value_counts()[:4]
-
-def get_works_by(name_pat):
-    creators = pd.DataFrame(tables['creators'])
-    titles = pd.DataFrame(tables['title'])
-    works = titles.loc[creators.val.str.contains(name_pat)]
-    return works
 
 milton = get_works_by('Milton, John')
 austen = get_works_by('Austen, Jane')
-
 
 import requests
 download_dir = '/home/rca2t/Public/ETA/data/gutenberg/downloads'
