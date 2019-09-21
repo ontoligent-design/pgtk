@@ -2,16 +2,22 @@
 
 #%% Import libraries
 
+# Core
 import glob
 import os
 import sys
 import subprocess
 import re
+
+# Data
 import pandas as pd
 import xml.etree.ElementTree as ET
 import requests
 import sqlite3
+
+# Interface
 import fire
+from tqdm import tqdm
 
 #%% Definitions
 
@@ -29,7 +35,8 @@ gut_url = 'https://www.gutenberg.org/ebooks/{}'
 gut_txt = 'https://www.gutenberg.org/ebooks/{}.txt'
 gut_utf8 = 'https://www.gutenberg.org/ebooks/{}.txt.utf-8'
 
-ns = dict(base="http://www.gutenberg.org/",
+ns = dict(
+    base="http://www.gutenberg.org/",
     rdfs="http://www.w3.org/2000/01/rdf-schema#",
     rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#",
     marcrel="http://id.loc.gov/vocabulary/relators/",
@@ -107,7 +114,7 @@ def get_metadata(gid):
 
 def get_catalog(gids):
     data = []
-    for gid in gids:
+    for gid in tqdm(gids):
         md = get_metadata(gid)
         for key in md.keys():
             if key == 'formats':
@@ -116,13 +123,13 @@ def get_catalog(gids):
                 vals = md[key]
             for val in vals:
                 val = val.upper()
-                val = re.sub(r'\r', ' ', val)
+                val = re.sub(r'[\n\r]+', ' ', val)
                 data.append((gid, key, val))
     df = pd.DataFrame(data, columns=['gid','key','val'])
     return df
 
 def get_catalog_wide(df):
-    print(df.head())
+    # print(df.head())
     df_wide = df.groupby(['gid', 'key']).val.apply(lambda x: '\n'.join(x))\
         .unstack().fillna('NONE GIVEN')
     return df_wide
@@ -155,37 +162,43 @@ def get_gids_for_pat_from_db(catalog, name_pat, key='creators'):
         df = pd.read_sql(sql, db, params=(name_pat,))
         return df.gid.tolist()
 
-#%% Commands
+#%% User Commands
 
 def download_cache(overwrite=True):
     """Download RDF catalog from Project Gutenburg"""
-    if overwrite == False or not os.path.exists(rdf_dir):
+    if overwrite == True or not os.path.exists(rdf_dir):
         print("Downloading RDF cache")
         rdf_zip = pg_rdf_url.split('/')[-1]
         rdf_tar =  rdf_zip.replace('.zip', '')
-        subprocess.call(['wget', pg_rdf_url])
-        subprocess.call(['unzip', rdf_zip])
-        subprocess.call(['tar', '-xf', rdf_tar])
-        subprocess.call(['rm', rdf_zip])
-        subprocess.call(['rm', rdf_tar])
+        subprocess.run(['wget', pg_rdf_url], cwd=pgtk_home)
+        subprocess.run(['unzip', rdf_zip], cwd=pgtk_home)
+        subprocess.run(['tar', '-xf', rdf_tar], cwd=pgtk_home)
+        subprocess.run(['rm', rdf_zip], cwd=pgtk_home)
+        subprocess.run(['rm', rdf_tar], cwd=pgtk_home)
     else:
-        print("RDF files exist on system. Set overwrite = True to overwrite.")
+        print("RDF files exist on system. Set '--overwrite True'.")
 
-def populate_database(replace=True):
+def populate_database(replace=False):
     """Create db with downloaded RDF data"""
     print("Creating database from RDF cache")
-    if  os.path.exists(rdf_dir):
-        gids = get_gids()
-        cat = get_catalog(gids)
-        cat_wide = get_catalog_wide(cat)
-        save_catalog_to_db(cat_wide)
+    if replace or not os.path.exists(db_name):
+        if  os.path.exists(rdf_dir):
+            print('Exracting data from cataglog')
+            gids = get_gids()
+            cat = get_catalog(gids)
+            print("Converting data into wide form")
+            cat_wide = get_catalog_wide(cat)
+            print("Saving data to database")
+            save_catalog_to_db(cat_wide)
+        else:
+            print("No RDF cache. Run download-cache first.")
     else:
-        print("No RDF cache. Run download-cache first.")
+        print("Database exists. To overwrite set '--replace True'")
 
 def remove_cache():
     """Remove RDF cache from file system"""
-    print("Removing RDF cache")
-    subprocess.call(['rm', '-rf', rdf_dir])
+    print("Removing RDF cache in", rdf_dir)
+    subprocess.run(['rm', '-rfv', rdf_dir])
 
 def print_results(results):
     """Print search results in standard format"""
@@ -232,7 +245,7 @@ def search_fields(ti='', cr='', su='', la='EN', ty='TEXT', fo='%TEXT/PLAIN%'):
         results = pd.read_sql_query(sql, db, params=params)
         print_results(results)
 
-def download_epubs(epub_file, outdir=None):
+def download_epubs(epub_file, outdir=None, sep='|'):
     """Download epubs from a list of files generated from a search"""
     
     if not outdir:
@@ -243,19 +256,20 @@ def download_epubs(epub_file, outdir=None):
     print("Downloading files to", outdir)
     with open(epub_file, 'r') as file:
         for line in file.readlines():
-            gid = line.split('|')[1]
+            row = line.split(sep)
+            gid = row[0]
             try:
                 int(gid)         
                 url = gut_utf8.format(gid)
                 r = requests.get(url)
-                filename = '_'.join(line.split('|')[2:4]).strip()
+                filename = '_'.join(row[1:3]).strip()
                 filename = re.sub(r'\W+', '_', filename)
                 filename = re.sub(r'_+', '_', filename)
                 print(gid, filename)       
                 with open("{}/{}-pg{}.txt".format(outdir, filename, gid), 'w') as outfile:
                     outfile.write(r.text)
             except ValueError as e:
-                print(gid, "not a GID")
+                print('#', gid, "not a GID")
 
 if __name__ == '__main__':
     
