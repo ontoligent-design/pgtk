@@ -1,5 +1,9 @@
 # Project Gutenberg Toolkit
 
+## Overview
+
+## Synopsis
+
 * Set `PGTK_HOME`. In `.bash_profile` enter:
   * `export PGTK_HOME="/where/you/put/pgtk"`
 * Link `pgtk` in `/usr/local/bin`.

@@ -189,21 +189,23 @@ def remove_cache():
 
 def print_results(results, mode='long'):
     """Print search results in standard format"""
-    for i, idx in enumerate(results.index):
+    for idx in results.index:
         item = results.loc[idx]
         if mode == 'long':
             print()
-            print('NO:', i+1)
+            print('NO:', idx+1)
             print('ID:', item.gid)
             print('AU:', item.creators)
-            print('TI:', item.title)
+            print('TI:', re.sub(r'[\n\r]+', ' ', item.title))
             # print('FT:', item.formats.replace('\n', '\nFT: '))
             print('DL:', gut_utf8.format(item.gid))
             print('DL:', gut_url.format(item.gid))
             print('SU:', item.subjects.replace('\n', '\nSU: '))
         elif mode == 'short':
-            print(i+1, item.gid, item.creators.replace('\n', ', '),
-                  item.title.replace('\n', ', '), gut_utf8.format(item.gid), sep='|')
+            print(idx+1, item.gid, 
+                re.sub(r'\n', ' ', item.creators),
+                re.sub(r'[\n\r]+', ' ', item.title), 
+                gut_utf8.format(item.gid), sep='|')
         else:
             print("No mode selected.")
 
@@ -227,17 +229,13 @@ def search_fields(ti='', cr='', su='', la='EN', ty='TEXT', fo='%TEXT/PLAIN%'):
     for f in args:
         if args[f] != '':
             where_clause_list.append("{} LIKE ? ".format(cat_fields[f]))            
-            if str(type(args[f])) == "<class 'tuple'>":
+            if type(args[f]).__name__ == 'tuple':
                 args[f] = ', '.join(args[f])
             if f == 'ti' or f == 'su' or f == 'cr':
                 args[f] = "%{}%".format(args[f].upper())
             params.append(args[f])
-    where_clause = '\nAND '.join(where_clause_list)
-    sql = """
-    SELECT * FROM catalog
-    WHERE {}
-    ORDER BY creators, title
-    """.format(where_clause)
+    where_clause = ' AND '.join(where_clause_list)
+    sql = "SELECT * FROM catalog WHERE {} ORDER BY creators, title".format(where_clause)
     with sqlite3.connect(db_name) as db:
         results = pd.read_sql_query(sql, db, params=params)
         print_results(results, mode='short')
@@ -258,7 +256,9 @@ def download_epubs(epub_file, outdir=None):
                 int(gid)         
                 url = gut_utf8.format(gid)
                 r = requests.get(url)
-                filename = re.sub(r'\W+', '_', '_'.join(line.split('|')[2:4]))
+                filename = '_'.join(line.split('|')[2:4]).strip()
+                filename = re.sub(r'\W+', '_', filename)
+                filename = re.sub(r'_+', '_', filename)
                 print(gid, filename)       
                 with open("{}/{}-pg{}.txt".format(outdir, filename, gid), 'w') as outfile:
                     outfile.write(r.text)
@@ -276,3 +276,4 @@ if __name__ == '__main__':
         'download-epubs': download_epubs,           'de': download_epubs
     }
     fire.Fire(commands)
+    
