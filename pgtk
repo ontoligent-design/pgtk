@@ -187,36 +187,28 @@ def remove_cache():
     print("Removing RDF cache")
     subprocess.call(['rm', '-rf', rdf_dir])
 
-def print_results(results, mode='long'):
+def print_results(results):
     """Print search results in standard format"""
+    data = []
     for idx in results.index:
         item = results.loc[idx]
-        if mode == 'long':
-            print()
-            print('NO:', idx+1)
-            print('ID:', item.gid)
-            print('AU:', item.creators)
-            print('TI:', re.sub(r'[\n\r]+', ' ', item.title))
-            # print('FT:', item.formats.replace('\n', '\nFT: '))
-            print('DL:', gut_utf8.format(item.gid))
-            print('DL:', gut_url.format(item.gid))
-            print('SU:', item.subjects.replace('\n', '\nSU: '))
-        elif mode == 'short':
-            print(idx+1, item.gid, 
-                re.sub(r'\n', ' ', item.creators),
-                re.sub(r'[\n\r]+', ' ', item.title), 
-                gut_utf8.format(item.gid), sep='|')
-        else:
-            print("No mode selected.")
-
-def run_query(where_clause, limit=1000, mode='short'):
+        row = (str(item.gid), 
+            re.sub(r'\n', ' ', item.creators),
+            re.sub(r'[\n\r]+', ' ', item.title), 
+            gut_utf8.format(item.gid))
+        data.append(row)
+    _ = [print('|'.join(row)) for row in data]
+    print('#', len(data), "items returned")
+    return data
+        
+def run_query(where_clause, limit=1000):
     """Run a query to the catalog table in the database. 
     Don't use a LIMIT clause; instead pass argument."""
     sql = "SELECT * FROM catalog WHERE {} ORDER BY creators, title LIMIT {}"\
         .format(where_clause, limit)
     with sqlite3.connect(db_name) as db:
         results = pd.read_sql_query(sql, db)
-        print_results(results, mode=mode)
+        print_results(results)
 
 def search_fields(ti='', cr='', su='', la='EN', ty='TEXT', fo='%TEXT/PLAIN%'):
     """Search catalog by fields:  title (ti), creators (cr), and subjects (su).
@@ -238,7 +230,7 @@ def search_fields(ti='', cr='', su='', la='EN', ty='TEXT', fo='%TEXT/PLAIN%'):
     sql = "SELECT * FROM catalog WHERE {} ORDER BY creators, title".format(where_clause)
     with sqlite3.connect(db_name) as db:
         results = pd.read_sql_query(sql, db, params=params)
-        print_results(results, mode='short')
+        print_results(results)
 
 def download_epubs(epub_file, outdir=None):
     """Download epubs from a list of files generated from a search"""
@@ -268,12 +260,12 @@ def download_epubs(epub_file, outdir=None):
 if __name__ == '__main__':
     
     commands = {
-        'download-cache': download_cache,           'dc': download_cache,
-        'populate-database': populate_database,     'pd': populate_database,
-        'remove-cache': remove_cache,               'rc': remove_cache,
-        'run-query': run_query,                     'rq': run_query,
-        'search-fields': search_fields,             'sf': search_fields,
-        'download-epubs': download_epubs,           'de': download_epubs
+        'getcat': download_cache,
+        'mkdb': populate_database,
+        'rmcat': remove_cache,
+        'query': run_query,
+        'search': search_fields,
+        'getpubs': download_epubs,
     }
     fire.Fire(commands)
     
