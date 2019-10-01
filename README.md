@@ -6,7 +6,7 @@
 
 * Set `PGTK_HOME`. In `.bash_profile` enter:
   * `export PGTK_HOME="/where/you/put/pgtk"`
-* Link `pgtk` in `/usr/local/bin`.
+* Link `pgtk` in `/usr/local/bin` or create an alias.
 * Run `pgtk` in your working directory.
 * To get started using pgtk, you need to download Gutenberg's RDF catalog and import it into the local database. Do:
    * `pgtk download-cache` or `pgtk dc`
