@@ -56,7 +56,6 @@ To use it, do these things:
 To find and download content, follow this pattern:
 * Search for something
   * `pgtk search au 'Austen'`
-* View results
 ```
 rca2t$ pgtk search --cr "austen"
 158|AUSTEN, JANE|EMMA|https://www.gutenberg.org/ebooks/158.txt.utf-8
@@ -84,7 +83,6 @@ rca2t$ pgtk search --cr "austen"
 ```
 * Adjust search
   * `pgtk search au 'Austen, J'`
-* View results
 ```
  rca2t$ pgtk search --cr "Austen, J"
 158|AUSTEN, JANE|EMMA|https://www.gutenberg.org/ebooks/158.txt.utf-8
@@ -104,7 +102,7 @@ rca2t$ pgtk search --cr "austen"
 ```
 * Save results
   * `pgtk search --cr "Austen, J" > AUSTEN.txt`
-  * Edit `AUSTEN.txt` if you'd like
+  * Edit `AUSTEN.txt` if you'd like, e.g. to remove any titles you don't want to download.
 * Download results
   * `pgtk getpubs AUSTEN.txt`
 ```
@@ -125,4 +123,5 @@ Downloading files to AUSTEN
 37431 AUSTEN_JANE_MACKAYE_STEELE_MRS_PRIDE_AND_PREJUDICE_A_PLAY_FOUNDED_ON_JANE_AUSTEN_S_NOVEL
 # # 13 items returned
 ```
+* Process the text files . . .
 
