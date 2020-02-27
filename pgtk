@@ -228,7 +228,7 @@ def search_fields(ti='', cr='', su='', la='EN', ty='TEXT', fo='%TEXT/PLAIN%'):
     Also: languages (la) defaults to 'EN', types (ty) defaults to 'TEXT', and 
     formats (fo) defaults to '%TEXT/PLAIN%'.
     """
-    args = locals()
+    args = dict(ti=ti, cr=cr, su=su, la=la, ty=ty, fo=fo) #locals()                                                               
     where_clause_list = []
     params = []
     for f in args:
