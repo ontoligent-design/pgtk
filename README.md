@@ -37,7 +37,7 @@ COMMANDS
 
 To install it, do something like this:
 
-* Clone this repo somewhere on your system.
+* Clone this repo somewhere on your system, or just donwload `pgtk`.
 * Create a directory to put `pgtk` resources, i.e. the executible file `pgtk` and the local database that `pgtk` needs to create.
 * Set `PGTK_HOME` to this directory. So, in `.bash_profile` enter:
   * `export PGTK_HOME="/where/you/put/pgtk"`
