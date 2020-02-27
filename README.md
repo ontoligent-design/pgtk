@@ -55,9 +55,8 @@ To use it, do these things:
    
 To find and download content, follow this pattern:
 * Search for something
-  * `pgtk search au 'Austen'`
+  * `pgtk search --cr 'Austen'`
 ```
-rca2t$ pgtk search --cr "austen"
 158|AUSTEN, JANE|EMMA|https://www.gutenberg.org/ebooks/158.txt.utf-8
 946|AUSTEN, JANE|LADY SUSAN|https://www.gutenberg.org/ebooks/946.txt.utf-8
 1212|AUSTEN, JANE|LOVE AND FREINDSHIP [SIC]|https://www.gutenberg.org/ebooks/1212.txt.utf-8
@@ -82,9 +81,8 @@ rca2t$ pgtk search --cr "austen"
 # 21 items returned
 ```
 * Adjust search
-  * `pgtk search au 'Austen, J'`
+  * `pgtk search --cr 'Austen, J'`
 ```
- rca2t$ pgtk search --cr "Austen, J"
 158|AUSTEN, JANE|EMMA|https://www.gutenberg.org/ebooks/158.txt.utf-8
 946|AUSTEN, JANE|LADY SUSAN|https://www.gutenberg.org/ebooks/946.txt.utf-8
 1212|AUSTEN, JANE|LOVE AND FREINDSHIP [SIC]|https://www.gutenberg.org/ebooks/1212.txt.utf-8
@@ -123,5 +121,5 @@ Downloading files to AUSTEN
 37431 AUSTEN_JANE_MACKAYE_STEELE_MRS_PRIDE_AND_PREJUDICE_A_PLAY_FOUNDED_ON_JANE_AUSTEN_S_NOVEL
 # # 13 items returned
 ```
-* Process the text files . . .
+* Do something with the downloaded files . . .
 
