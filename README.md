@@ -51,7 +51,7 @@ To use it, do these things:
 * You will first need to download Gutenberg's RDF catalog and import it into the local database. Do this:
    * `pgtk getcat`
 * Then:
-   * `pgtk mkdir`
+   * `pgtk mkdb`
    
 To find and download content, follow this pattern:
 * Search for something
