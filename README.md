@@ -39,7 +39,7 @@ To install it, do something like this:
 
 * Clone this repo somewhere on your system, or just donwload `pgtk`.
 * Create a directory to put `pgtk` resources, i.e. the executible file `pgtk` and the local database that `pgtk` needs to create.
-* Set `PGTK_HOME` to this directory. So, in `.bash_profile` enter:
+* Set `PGTK_HOME` to this directory. So, in `.bash_profile` (or the profile for whatever shell you are using) enter:
   * `export PGTK_HOME="/where/you/put/pgtk"`
 * Run `chmod +x pgtk` to make the file executible and then symlink to an alias in `/usr/local/bin`. Or, you create an alias statement for it in your bash profile to the file.
 * Source your bash profile file.
@@ -51,7 +51,7 @@ To use it, do these things:
 * You will first need to download Gutenberg's RDF catalog and import it into the local database. Do this:
    * `pgtk getcat`
 * Then:
-   * `pgtk mkdir`
+   * `pgtk mkdb`
    
 To find and download content, follow this pattern:
 * Search for something
